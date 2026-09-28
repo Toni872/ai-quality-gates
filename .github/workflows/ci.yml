@@ -50,7 +50,7 @@ jobs:
       detected: ${{ steps.detect.outputs.detected }}
       notice: ${{ steps.detect.outputs.notice }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -118,7 +118,7 @@ jobs:
       matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve commands from openspec/config.yaml
         id: cfg
@@ -168,7 +168,7 @@ jobs:
       # --- Node -------------------------------------------------------------
       - name: Set up Node
         if: matrix.type == 'node'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -190,7 +190,7 @@ jobs:
       # --- Python -----------------------------------------------------------
       - name: Set up Python
         if: matrix.type == 'python'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -208,7 +208,7 @@ jobs:
       # --- Go ---------------------------------------------------------------
       - name: Set up Go
         if: matrix.type == 'go'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: '1.23'
           cache: true
