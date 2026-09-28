@@ -75,11 +75,19 @@ jobs:
             # test job short-circuits on it and `degraded` reports the notice.
             echo 'matrix=[{"type":"none"}]' >> "$GITHUB_OUTPUT"
             echo "detected=false" >> "$GITHUB_OUTPUT"
+            # A multi-line output value MUST use the heredoc form
+            # (`key<<DELIM` ... `DELIM`). Writing repeated `key=value` lines
+            # does not accumulate into one value: the runner parses every line
+            # as its own key and fails the step on the first line that is not
+            # `key=value`, which is a confusing error that points at the wrong
+            # line. This exact mistake broke the first CI run of this template.
             {
-              echo "notice=No supported project type found."
+              echo "notice<<GHA_EOF"
+              echo "No supported project type found."
               echo "Expected one of: package.json, pyproject.toml, requirements.txt, setup.py, go.mod."
               echo "This template ships no application code, so there is nothing to test."
               echo "Add one of those files and set test_command in openspec/config.yaml."
+              echo "GHA_EOF"
             } >> "$GITHUB_OUTPUT"
             echo "::notice title=CI degraded::No supported project type found. Nothing was tested."
             exit 0
