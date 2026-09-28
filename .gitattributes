@@ -1,0 +1,56 @@
+# Normalize line endings.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# A shell script committed with CRLF line endings fails on Linux CI with an
+# error that points at the wrong line ("unexpected token $'\r'"), and the
+# failure usually surfaces in a file nobody suspected. A gga hook written on
+# Windows and run on a Linux CI runner is the same failure. Pinning the
+# endings in the repository is cheaper than debugging it twice.
+#
+# Shell scripts and CI-invoked scripts must be LF, always, with no exception
+# and no .shopt override.
+
+* text=auto eol=lf
+
+# Windows-native tooling. These tolerate CRLF and, for a shell-free
+# environment, CRLF is the friendlier default.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binaries: never touched.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+
+# Lockfiles are not diffable when line endings change; pin them to LF so a
+# checkout on any OS produces the same hash and the same content.
+*lock.json      text eol=lf
+*lock.yaml      text eol=lf
+*lock.yml       text eol=lf
+pnpm-lock.yaml  text eol=lf
+package-lock.json text eol=lf
+yarn.lock       text eol=lf
+Cargo.lock      text eol=lf
+poetry.lock     text eol=lf
+uv.lock         text eol=lf
+go.sum          text eol=lf
+
+# Generated artifacts are commonly excluded from review. Language-specific
+# generated sections belong in the consuming project's own .gitattributes;
+# the defaults below only cover the common ones.
+*.pb.go          text eol=lf linguist-generated=true
+*_pb2.py         text eol=lf linguist-generated=true
+*.g.dart         text eol=lf linguist-generated=true
+*.freezed.dart   text eol=lf linguist-generated=true

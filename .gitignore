@@ -1,0 +1,214 @@
+# ============================================================================
+# ai-quality-gates — .gitignore
+#
+# The multi-ecosystem baseline plus the tool state and cache directories that
+# must never be committed. Everything in this file is an ignore rule; nothing
+# here is a substitute for knowing what your build emits.
+#
+# DELIBERATELY NOT IGNORED (do not add these):
+#   AGENTS.md                  — the constitution, loaded by agents every session
+#   .gga                       — the pre-commit gate configuration
+#   .gentle-ai.md              — repo-level gentle-ai config, if you add one
+#   openspec/                  — the spec layer, the source of intent
+#   .github/                   — CI workflows and the PR template are the gates
+#   docs/                      — the operating rules
+#   *.local.example            — committed templates for local overrides
+# ============================================================================
+
+
+# ---------------------------------------------------------------------------
+# Node / JavaScript / TypeScript
+# ---------------------------------------------------------------------------
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.output/
+.vercel/
+.turbo/
+.astro/
+storybook-static/
+target/debug/
+target/release/
+
+# Test and coverage output
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Caches
+.npm/
+.eslintcache
+.stylelintcache
+.tsbuildinfo
+*.tsbuildinfo
+.swc/
+.tmp/
+.temp/
+
+# Yarn
+.yarn/cache/
+.yarn/install-state.gz
+.yarn/unplugged/
+.pnp.*
+
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Packaging and build
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+
+
+# ---------------------------------------------------------------------------
+# Go
+# ---------------------------------------------------------------------------
+# `go build` writes an extensionless executable named after the module's last
+# path element. Add your own module name here — this is the line people forget,
+# and the failure is a committed multi-megabyte binary in your first PR.
+# /yourmodule
+# /cmd/yourmodule
+# bin/
+*.test
+*.out
+
+# Coverage and profiling
+coverage.txt
+*.prof
+*.pprof
+*.coverprofile
+
+# Shared library and cgo output
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+
+
+# ---------------------------------------------------------------------------
+# Rust / JVM / .NET (included so the template is usable outside Node)
+# ---------------------------------------------------------------------------
+/target/
+*.rs.bk
+
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.kotlin/
+**/out/
+*.csproj.user
+*.suo
+.vs/
+bin/Debug/
+bin/Release/
+
+
+# ---------------------------------------------------------------------------
+# Environment and secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Local overrides and credentials that are per-machine by nature
+*.local
+!*.local.example
+!*.local.template
+secrets/
+*.pem
+*.key
+!test-fixtures/**/*.pem
+id_rsa
+id_ed25519
+.netrc
+.aws/
+.ssh/
+
+
+# ---------------------------------------------------------------------------
+# gentle-ai / gga / agent tooling state and cache
+#
+# This is the section people get wrong. Tool state describes one machine's
+# installed state; committing it makes a clone claim a configuration that does
+# not exist locally, and it produces merge conflicts on every install.
+# ---------------------------------------------------------------------------
+
+# Installed tool state and machine-local agent inventory
+.gentle-ai/
+.gentle-ai-local/
+
+# gga cache and generated reports.
+# NOTE: do not add a `.gga/` directory rule. That pattern is one character away
+# from the `.gga` config file at the repo root, and a directory ignore on that
+# name is a trap waiting for the next person. If your gga build writes a cache
+# directory named `.gga/`, rename it or ignore it by a distinct name.
+gga-cache/
+.gga-cache/
+.gentle-ai-gga/
+*.gga-cache/
+
+# Receipt-driven development receipts are per-candidate, not per-repo
+# (adjust to match whatever directory your RDD implementation writes into)
+.rdd/
+.rdd-receipts/
+receipts/
+
+# Agent-local prompt caches and machine-local agent configuration
+.agent/
+.agents/local/
+*.agent.local
+opencode.local.json

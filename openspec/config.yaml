@@ -1,0 +1,82 @@
+# ============================================================================
+# openspec/config.yaml
+#
+# Project-level configuration for the specification layer. Copied into your
+# repository as-is; you must fill in the placeholders below before enabling
+# any gate, because every downstream layer reads its commands from this file.
+#
+# WHY STRICT TDD IS TRUE BY DEFAULT HERE
+#
+# A test written after the implementation is a description of what the code
+# does. A test written before it is a statement of what the code must do, and
+# the implementation has to satisfy it. Only the second kind can fail for a
+# reason the author did not anticipate, and only the second kind is a
+# regression signal rather than a rubber stamp.
+#
+# This matters more under AI assistance, not less. An agent writes the
+# implementation and the test in the same pass, from the same model of the
+# problem, and that model is exactly what is in doubt. When both artifacts come
+# from the same assumption, a green suite proves the assumption is internally
+# consistent and says nothing about whether it is correct. Test-first forces
+# the contract to be written down and made executable before the code exists,
+# which is the only point at which the assumption can still be contradicted.
+#
+# strict_tdd: true means the workflow expects: red test committed, then
+# implementation, then green. It is not a suggestion.
+# ============================================================================
+
+# --- Strictness ------------------------------------------------------------
+strict_tdd: true
+
+# --- Commands --------------------------------------------------------------
+# These are the ONLY commands any gate in this stack is permitted to run.
+# CI (.github/workflows/ci.yml) reads test_command from this file rather than
+# hardcoding its own, so that the local run and the CI run cannot diverge.
+# If they diverge, the gate proves nothing about the code that will ship.
+
+# REPLACE THIS. Put the real command that runs your test suite here.
+#
+# A wrong command here produces false evidence, and false evidence is worse
+# than no evidence: it converts a missing gate into a gate that appears to be
+# satisfied. Specifically, all of the following are unacceptable —
+#   test_command: "true"            # exits 0 without running anything
+#   test_command: "echo no tests"   # same problem, less obvious
+#   test_command: "npm test"        # when the project uses pnpm, or has no test script
+#   test_command: "pytest"          # when the project is not Python
+# If you have no test suite yet, write the command that will exist and add the
+# suite, rather than writing a command that passes over nothing.
+test_command: "REPLACE: your real test command, e.g. pnpm test"
+
+# Lint command. MAY be null.
+# Leave it null if your project genuinely has no lint step. Do not write a
+# command you have not run. An agent must NOT invent a lint command, and must
+# NOT substitute a package manager default that is not wired to a real script.
+lint_command: null  # REPLACE with a real command, or leave null deliberately
+
+# Typecheck command. MAY be null.
+# Same rule as lint_command. Leave null when there is no separate typecheck
+# step (for example a dynamically typed project, or one where the build already
+# typechecks). Never invent one.
+typecheck_command: null  # REPLACE with a real command, or leave null deliberately
+
+# --- Build -----------------------------------------------------------------
+# Not part of the test gate. Used by CI to confirm the project builds.
+# May be null.
+build_command: null  # REPLACE with a real command, or leave null deliberately
+
+# --- Rollout ---------------------------------------------------------------
+# Which risk tiers are subject to independent review. Read docs/risk-tiering.md
+# before changing these. The staged values here are the recommended order:
+# tier_1 first, tier_2 only after the team has measured its Tier 2 review cost.
+rdd:
+  enabled: false
+  tiers: []
+  # tiers: [1]
+  # tiers: [1, 2]
+
+# The pre-commit style gate. See .gga for provider and rules configuration.
+# gga reads its own configuration from .gga; this block records the intent so
+# the rollout state is visible in one place.
+gga:
+  enabled: false
+  rules_file: "AGENTS.md"

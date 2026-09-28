@@ -1,0 +1,107 @@
+# ============================================================================
+# .gga — Gentleman Guardian Angel configuration
+# Pre-commit gate. Native KEY="value" format; one entry per line, no commas
+# between lines, values in double quotes.
+#
+# WHAT THIS IS: a hook that runs locally, on every commit, before the commit is
+# created. It reads the rules file and checks the staged/working diff against
+# the rules that file states. It is cheap, it is mechanical, and it is
+# deliberately unable to judge whether your code is correct.
+#
+# WHAT THIS IS NOT: a CI gate. It runs on the machine of whoever is committing.
+# It is trivially bypassed with `--no-verify` and it is absent entirely on
+# every machine where `gga install` was not run. Never treat a green gga run
+# as evidence that a change reached the repository; the enforced copy of these
+# rules belongs in CI, reading the same rules file.
+#
+# PER-REPOSITORY SETUP (required — this file alone installs nothing):
+#
+#   gga init      # writes/updates .gga in this repository. Run once per repo.
+#   gga install   # registers the actual pre-commit hook. Run once per repo.
+#                 # On a fresh clone, run it again: hooks are not committed.
+#
+# Confirm it took effect:
+#
+#   ls -la .git/hooks/pre-commit      # should exist and be executable
+#   gga --help                         # confirm the installed subcommand names
+#
+# ============================================================================
+
+# --- Provider --------------------------------------------------------------
+# The model that evaluates your diff against the rules file.
+#
+# Tradeoff for each option: you are trading evaluation quality, latency, cost,
+# and — for client work — data residency. Read the last row before choosing.
+PROVIDER="opencode"
+
+# Alternatives:
+#
+# PROVIDER="claude"      Strong quality on long, multi-rule diffs. Cloud. Source
+#                        code and diff contents are sent to the provider.
+# PROVIDER="gemini"      Large context window, so it is the most tolerant of a
+#                        very long single-file diff. Cloud.
+# PROVIDER="codex"       Fast and cheap for short diffs. Cloud. Weaker on
+#                        multi-step reasoning across many small files.
+# PROVIDER="github"      Convenient if you already run everything through
+#                        GitHub Copilot. Cloud.
+#
+# --- FULLY LOCAL (REQUIRED FOR MOST CLIENT WORK) ---------------------------
+# Use one of these when the code must not leave the machine. Nothing is
+# transmitted; the model runs on the developer's hardware.
+#
+# PROVIDER="ollama:gpt-oss:20b"    Local Ollama daemon. Syntax is
+#                                    ollama:<model>, default port 11434.
+#                                    Check available models with: ollama list
+#                                    Start the daemon with:  ollama serve
+#                                    Quality scales with the model you pick.
+#                                    A small local model will produce more
+#                                    false positives than a frontier model;
+#                                    tune STRICT_MODE and the rules file to
+#                                    match, and expect to spend a week tuning.
+# PROVIDER="lmstudio"              LM Studio local server. Good option for
+#                                    Windows and macOS desktops where Ollama is
+#                                    not installed. Verify the local server is
+#                                    running and the loaded model is the one
+#                                    you intend before trusting a clean run.
+#
+# See docs/client-data-safety.md before selecting a cloud provider for code
+# that belongs to a client.
+
+# --- Files checked ---------------------------------------------------------
+# Comma-separated glob list. Only these extensions are ever evaluated.
+# Deliberately narrow: a hook that reads generated files and vendored
+# dependencies will produce findings nobody can act on.
+FILE_PATTERNS="*.ts,*.tsx,*.js,*.jsx,*.py,*.go"
+
+# --- Files skipped ---------------------------------------------------------
+# Tests and specs are excluded because they legitimately do the things the
+# house style forbids in production code (magic numbers, long lines, inline
+# comments, duplicated setup). Excluding them is a judgment call, not a
+# technical limit: if you want tests held to the same style, remove the first
+# two patterns and accept the false-positive rate that follows.
+EXCLUDE_PATTERNS="*.test.*,*.spec.*,*.d.ts,dist/*,build/*,node_modules/*"
+
+# --- Rules source ----------------------------------------------------------
+# The gate enforces the rules stated in this file. gga has no opinion of its
+# own; if a rule is not written in AGENTS.md, the gate does not check it.
+# Consequence: writing clear, specific, checkable rules in AGENTS.md is the
+# entire configuration work. Vague rules produce vague findings that the team
+# learns to ignore.
+RULES_FILE="AGENTS.md"
+
+# --- Behavior --------------------------------------------------------------
+# true  = any rule violation blocks the commit.
+# false = violations are reported as warnings and the commit proceeds.
+#
+# Start with false if you are installing this into a repository with history:
+# run it for a week, read every finding, tune AGENTS.md until the false-positive
+# rate is acceptable, then switch to true. Enabling STRICT_MODE on day one on an
+# untuned rules file is how a pre-commit hook gets removed by the team, and a
+# removed hook does not come back.
+STRICT_MODE="true"
+
+# Seconds before the evaluation is abandoned. Raise this for large diffs on a
+# local model; a timeout that fires during a long review is indistinguishable
+# from a pass, so treat a timeout as a failure you must investigate rather than
+# a clean run.
+TIMEOUT="300"

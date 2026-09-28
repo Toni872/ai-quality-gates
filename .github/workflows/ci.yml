@@ -1,0 +1,239 @@
+# ============================================================================
+# ci.yml — generic, language-detecting CI.
+#
+# This template ships NO application code, so this workflow cannot know your
+# language. Instead it detects the project type from marker files and runs the
+# install step plus the test command declared in openspec/config.yaml.
+#
+# WHY IT READS openspec/config.yaml INSTEAD OF HARDCODING A COMMAND
+# ------------------------------------------------------------------
+# CI must run the exact same command declared in openspec/config.yaml. If the
+# two diverge, the gate proves nothing: you get a green run in CI from a
+# command that the local gate and the review receipt never execute, which is
+# indistinguishable, in the result, from a genuine pass. One source of truth,
+# read by both. The same applies to lint_command and typecheck_command below.
+#
+# DEGRADED MODE
+# -------------
+# When none of the marker files are present (that is, in the template repo
+# itself), the detect job emits a `none` entry and the test job exits 0 with a
+# notice. The template's own CI is therefore green while a consuming project
+# gets a real run the moment it adds a package.json, pyproject.toml, or go.mod.
+# Degraded mode is not a pass for your code; check the job log for the notice
+# before you believe a run did anything.
+# ============================================================================
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only by default. Nothing in this workflow writes to the repository, and
+# an untrusted pull request must never be able to widen this.
+permissions:
+  contents: read
+
+# Superseded runs on the same ref are cancelled. A push to a PR branch that
+# lands before the previous CI run finishes makes that run irrelevant.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: detect project type
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.detect.outputs.matrix }}
+      detected: ${{ steps.detect.outputs.detected }}
+      notice: ${{ steps.detect.outputs.notice }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect project type from marker files
+        id: detect
+        run: |
+          set -euo pipefail
+          types=()
+
+          if [ -f package.json ]; then
+            types+=("node")
+          fi
+          if [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f setup.py ]; then
+            types+=("python")
+          fi
+          if [ -f go.mod ]; then
+            types+=("go")
+          fi
+
+          if [ ${#types[@]} -eq 0 ]; then
+            # Degraded mode. One sentinel entry with no recognised `type`; the
+            # test job short-circuits on it and `degraded` reports the notice.
+            echo 'matrix=[{"type":"none"}]' >> "$GITHUB_OUTPUT"
+            echo "detected=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "notice=No supported project type found."
+              echo "Expected one of: package.json, pyproject.toml, requirements.txt, setup.py, go.mod."
+              echo "This template ships no application code, so there is nothing to test."
+              echo "Add one of those files and set test_command in openspec/config.yaml."
+            } >> "$GITHUB_OUTPUT"
+            echo "::notice title=CI degraded::No supported project type found. Nothing was tested."
+            exit 0
+          fi
+
+          # Build the matrix as a JSON array of one-key objects.
+          json=""
+          for t in "${types[@]}"; do
+            if [ -n "$json" ]; then
+              json="${json},"
+            fi
+            json="${json}{\"type\":\"${t}\"}"
+          done
+          echo "matrix=[${json}]" >> "$GITHUB_OUTPUT"
+          echo "detected=true" >> "$GITHUB_OUTPUT"
+          echo "notice=" >> "$GITHUB_OUTPUT"
+          echo "Detected: ${types[*]}"
+
+  test:
+    name: test (${{ matrix.type }})
+    needs: detect
+    if: needs.detect.outputs.matrix != '' && needs.detect.outputs.detected == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      # Run every detected ecosystem, but never let one language's failure hide
+      # the results of another.
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve commands from openspec/config.yaml
+        id: cfg
+        run: |
+          set -euo pipefail
+          cfg="openspec/config.yaml"
+          if [ ! -f "$cfg" ]; then
+            echo "::error title=Missing openspec/config.yaml::Cannot resolve the test command. The gate has no source of truth and will not guess one."
+            exit 1
+          fi
+
+          read_command() {
+            # Deliberately a plain single-line scalar read: `key: value` or
+            # `key: "value"` on one line, optionally with a trailing comment.
+            # Anything more complex belongs behind a wrapper script that the
+            # config points at, so that CI never has to parse a language.
+            sed -n "s/^$1:[[:space:]]*//p" "$cfg" \
+              | head -n 1 \
+              | sed -e 's/[[:space:]]*#.*$//' \
+                    -e 's/^["]//' \
+                    -e 's/["]$//' \
+                    -e 's/[[:space:]]*$//'
+          }
+
+          test_cmd="$(read_command test_command || true)"
+          lint_cmd="$(read_command lint_command || true)"
+          type_cmd="$(read_command typecheck_command || true)"
+
+          for name in test_cmd lint_cmd type_cmd; do
+            val="${!name}"
+            if [ -z "$val" ] || [ "$val" = "null" ]; then
+              echo "${name}=" >> "$GITHUB_OUTPUT"
+            elif printf '%s' "$val" | grep -qiE 'REPLACE|your real|placeholder|example\.com'; then
+              echo "::error title=Unresolved placeholder::${name} still contains the template placeholder: ${val}. A wrong test command produces false evidence — CI would go green without testing anything. Set the real command in openspec/config.yaml."
+              exit 1
+            else
+              echo "${name}=${val}" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+      - name: Notice — no command configured
+        if: steps.cfg.outputs.test_cmd == ''
+        run: |
+          echo "::error title=No test command::test_command in openspec/config.yaml is null or empty. Set it to the command that actually runs your test suite. Do not leave it empty to make CI green."
+          exit 1
+
+      # --- Node -------------------------------------------------------------
+      - name: Set up Node
+        if: matrix.type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install (Node)
+        if: matrix.type == 'node'
+        run: |
+          set -euo pipefail
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            corepack enable
+            yarn install --frozen-lockfile
+          else
+            npm ci || npm install
+          fi
+
+      # --- Python -----------------------------------------------------------
+      - name: Set up Python
+        if: matrix.type == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install (Python)
+        if: matrix.type == 'python'
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          elif [ -f pyproject.toml ]; then
+            python -m pip install -e .
+          fi
+
+      # --- Go ---------------------------------------------------------------
+      - name: Set up Go
+        if: matrix.type == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Download (Go)
+        if: matrix.type == 'go'
+        run: go mod download
+
+      # --- Gates ------------------------------------------------------------
+      # Each step runs the command read out of openspec/config.yaml above, and
+      # each step exits non-zero when the command fails. A step marked
+      # `continue-on-error` here would be a gate that proves nothing.
+      - name: Test — ${{ steps.cfg.outputs.test_cmd }}
+        run: ${{ steps.cfg.outputs.test_cmd }}
+
+      - name: Lint — ${{ steps.cfg.outputs.lint_cmd }}
+        if: steps.cfg.outputs.lint_cmd != ''
+        run: ${{ steps.cfg.outputs.lint_cmd }}
+
+      - name: Typecheck — ${{ steps.cfg.outputs.type_cmd }}
+        if: steps.cfg.outputs.type_cmd != ''
+        run: ${{ steps.cfg.outputs.type_cmd }}
+
+  degraded:
+    name: test (no project detected)
+    needs: detect
+    if: needs.detect.outputs.detected == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notice
+        run: |
+          echo "::notice title=CI degraded::${{ needs.detect.outputs.notice }}"
+          echo "${{ needs.detect.outputs.notice }}"
+          echo ""
+          echo "This run did not test anything. It is not a pass."
+          exit 0
